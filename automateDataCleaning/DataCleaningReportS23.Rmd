@@ -1,0 +1,295 @@
+---
+title: "Data Cleaning Report S23"
+author: "Kennedy Zapalac"
+date: "2023-05-24"
+output: pdf_document
+---
+
+```{r requires user input, include=FALSE}
+# change these depending on what dataset you are cleaning
+
+# file names -------------------------------------------------------------------
+# the files are pulled from whatever directory this document is in, so include any subfolders from your current directory
+# if the files aren't directly in this directory
+raw_completed_pre_filename <-  "S23Pre-test_completed_041223 copy.csv" # don't forget to include .csv at the end of the file name
+raw_inProgress_pre_filename <-  NULL # optional if you are analyzing the data before all responses have been deemed complete
+raw_completed_post_filename <-  "S23Post-test_completed_042123 copy.csv"
+raw_inProgress_post_filename <-  "S23Post-test_inProgress_042123 copy.csv" # optional if you are analyzing the data before all responses have been deemed complete
+cleaned_pre_filename <-  "S23Pre-test_cleaned.csv"
+cleaned_post_filename <-  "S23Post-test_cleaned.csv"
+matched_pre_and_post_filename <- "S23matched_data_cleaned.csv"
+
+# Composite Variables ----------------------------------------------------------
+# if you want to compute anything other than averages, you will need to edit the code below in pretest and postest data processing
+# list of variables you would like to create a composite for, using the question abbreviations from the survey:
+comp_vars <- c("ERQ", "StressM", "MWQ", "RS", "GrowM", "SelfEf", "Motiv")
+# list of the number of questions for each composite above
+comp_vars_n_qs <- c(6, 4, 5, 6, 3, 3, 3)
+
+# Important Notes --------------------------------------------------------------
+# You may still need to edit the code slightly below to work for your specific dataset
+# There are a few sections highlighted with "CHECK THIS" that you should take a look at
+
+# Errors you may encounter:
+  # improper column names
+  # data that doesn't exist but has code referring to it (one survey may test resilience while another does not)
+  # Some of the code was altered. For example, if you edit a variable name somewhere
+    # and later code references the old variable name, then it will no longer be able to find
+    # that variable
+
+# To overcome these potential errors:
+  # 1. Make sure to use proper column names when creating the survey (listed in Research Partnerships manual)
+    # and change any improper column names before running this script
+  # 2. Comment out code for the variables that don't exist in your dataset
+    # E.g., composites created for non-existent variables in this dataset
+
+# Even if you are able to run this code without errors, you should check to make sure
+# it is working properly. Check the data cleaning report by knitting this document 
+# after altering the script for your dataset (if necessary). Make sure that nothing seems awry here.
+# For example, it would be fishy if no previews are removed if you know there are
+# previews within the dataset.
+# Also, read over the whole script and make sure that you know what it's doing
+# This will prevent any hidden errors that might not be apparent in the data report
+```
+
+```{r setup, include=FALSE}
+# install (if needed) and load packages 
+# install.packages("tidyverse")
+library(tidyverse)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.pacakges("psych")
+library(psych)
+
+# homemade functions
+source("data_cleaning_functions.R") # file must be in the working directory
+```
+
+```{r pretest data processing, include=FALSE}
+# load and clean the data
+pre_data <- load_data(completed_file = raw_completed_pre_filename, inProgress_file = raw_inProgress_pre_filename )
+
+# CHECK THIS: variables names ------------------------------------------------------------------
+# and change this section according to your needs #
+# rename improper columns (ideally there shouldn't be any if you use the format recommended in the manual when creating the survey in Qualtrics)
+pre_data <- rename_cols(data=pre_data, oldSubString = "StressM_", newSubString = "StressM")
+colnames(pre_data)[which(names(pre_data)=='1_student_ID')] <- "student_ID"
+colnames(pre_data)[which(names(pre_data)=='1_student_ID2')] <- "student_ID2"
+pre_data <- pre_data %>%
+  rename('birthday_1' = 'Birthday_pre_1',
+         'birthday_2' = 'Birthday_pre_2',
+         'birthday_3' = 'Birthday_pre_3')
+  
+# finish reformatting the columns ----------------------------------------------
+ # if there are any other columns
+  # that will need to be removed repeatedly in the future, please add them to the function
+pre_data <- create_teacher_col(data=pre_data)
+pre_data$teacher <- sub("=", "", pre_data$teacher)
+pre_data <- reformat_bday(data=pre_data) # won't need this in the future if we provide answer choices
+pre_data <- convert_dtypes(data=pre_data)
+
+# remove responses -------------------------------------------------------------
+pre_length_raw <- nrow(pre_data) # record the unprocessed number of responses
+pre_data <- remove_previews(pre_data) # record the number of previews removed
+pre_previews <- pre_length_raw - nrow(pre_data)
+pre_data <- remove_blank(data=pre_data)
+pre_blanks <- pre_length_raw - pre_previews - nrow(pre_data) # record the number of blank responses removed
+duplicates_keep <- select_duplicates(pre_data, pre=T)
+pre_data <- remove_duplicates(pre_data)
+pre_data <- rbind(pre_data, duplicates_keep) # add the duplicates we are keeping back
+pre_duplicates <- pre_length_raw - pre_previews - pre_blanks - nrow(pre_data) # record the number of duplicates removed
+# double check that there are no duplicates remaining
+n_student_ID <- data.frame(table(pre_data$student_ID))
+pre_data_duplicates_cleaned <- pre_data[pre_data$student_ID %in% n_student_ID$Var1[n_student_ID$Freq > 1],]
+pre_data_n_duplicates_cleaned <- sum(duplicated(pre_data$student_ID))
+# check how many responses were removed during cleaning
+pre_total_removed <- pre_previews + pre_blanks + pre_duplicates
+pre_removed_responses <- data.frame(previews=pre_previews, blank=pre_blanks, duplicates=pre_duplicates, total=pre_total_removed)
+# num of students after cleaning
+pre_cleaned_total_responses <- nrow(pre_data)
+
+# create composites ------------------------------------------------------------
+# this function computes averages, which might not be appropriate depending on your dataset
+pre_data <- create_composites(data=pre_data, Q_names=comp_vars, Q_numbers=comp_vars_n_qs, pre=T)
+
+# room for growth (ideal focus > actual focus)
+pre_data$room_to_grow <- pre_data$undivided_ideal_pre_1 > pre_data$undivided_actual_pre_1
+
+# attention check --------------------------------------------------------------
+# passed attention check
+pre_passed_att_check <- sum(pre_data$ATT_CHECK_pre, na.rm=T)
+pre_percent_passed_att_check <- (round(pre_passed_att_check/pre_cleaned_total_responses, digits=3))*100
+pre_failed_att_check <- sum(pre_data$ATT_CHECK_pre==0, na.rm=T)
+pre_percent_failed_att_check <- (round(pre_failed_att_check/pre_cleaned_total_responses, digits=3))*100
+pre_att_check_missing <- sum(is.na(pre_data$ATT_CHECK_pre))
+pre_percent_att_check_missing <- (round(pre_att_check_missing/pre_cleaned_total_responses, digits=3))*100
+
+# save the cleaned data --------------------------------------------------------
+write.csv(pre_data, cleaned_pre_filename, row.names=F)
+```
+
+```{r postest data processing, include=FALSE}
+# load and clean the data
+post_data <- load_data(completed_file = raw_completed_post_filename, inProgress_file = raw_inProgress_post_filename)
+
+# CHECK THIS: variable names ------------------------------------------------------------------
+# change this section according to your needs ##
+# rename improper columns (ideally there shouldn't be any if you use the format recommended in the manual when creating the survey in Qualtrics)
+# # there aren't any for this dataset since I created this template based on this dataset
+post_data <- rename_cols(data=post_data, oldSubString = "StressM_", "StressM")
+colnames(post_data)[which(names(post_data)=='1_student_ID')] <- "student_ID"
+colnames(post_data)[which(names(post_data)=='1_student_ID2')] <- "student_ID2"
+post_data <- post_data %>% 
+  rename('birthday_1' = 'Birthday_post_1', 
+         'birthday_2' = 'Birthday_post_2',    
+         'birthday_3' = 'Birthday_post_3')
+
+# finish reformatting the columns ----------------------------------------------
+post_data <- remove_col_spaces(data=post_data)
+post_data <- remove_extra_cols(data=post_data) # if there are any other columns
+  # that will need to be removed repeatedly in the future, please add them to the function
+post_data <- create_teacher_col(data=post_data)
+post_data$teacher <- sub("=", "", post_data$teacher)
+post_data <- reformat_bday(data=post_data) # won't need this in the future if we provide answer choices
+post_data <- convert_dtypes(data=post_data)
+
+# remove responses -------------------------------------------------------------
+post_length_raw <- nrow(post_data) # record the unprocessed number of responses
+post_data <- remove_previews(post_data) # record the number of previews removed
+post_previews <- post_length_raw - nrow(post_data)
+post_data <- remove_blank(data=post_data)
+post_blanks <- post_length_raw - post_previews - nrow(post_data) # record the number of blank responses removed
+duplicates_keep <- select_duplicates(post_data, pre=F)
+post_data <- remove_duplicates(post_data)
+post_data <- rbind(post_data, duplicates_keep) # add the duplicates we are keeping back
+post_duplicates <- post_length_raw - post_previews - post_blanks - nrow(post_data) # record the number of duplicates removed
+# double check that there are no duplicates remaining
+n_student_ID <- data.frame(table(post_data$student_ID))
+post_data_duplicates_cleaned <- post_data[post_data$student_ID %in% n_student_ID$Var1[n_student_ID$Freq > 1],]
+post_data_n_duplicates_cleaned <- sum(duplicated(post_data$student_ID))
+# check how many responses were removed during cleaning
+post_total_removed <- post_previews + post_blanks + post_duplicates
+post_removed_responses <- data.frame(previews=post_previews, blank=post_blanks, duplicates=post_duplicates, total=post_total_removed)
+# num of students after cleaning
+post_cleaned_total_responses <- nrow(post_data)
+
+# create composites ------------------------------------------------------------
+# this function computes averages, which might not be appropriate depending on your dataset
+post_data <- create_composites(data=post_data, Q_names=comp_vars, Q_numbers=comp_vars_n_qs, pre=F)
+# had to create this composite by hand since it's only present in the post df
+# could have included it in the list for Q_names above just for the post df
+post_data$CQ_score <- post_data %>% 
+  select('CQ1_post', 'CQ2_post', 'CQ3_post') %>% 
+  rowSums(na.rm=T)/3
+
+# attention check --------------------------------------------------------------
+# passed attention check
+post_passed_att_check <- sum(post_data$ATT_CHECK_post, na.rm=T)
+post_percent_passed_att_check <- (round(post_passed_att_check/post_cleaned_total_responses, digits=3))*100
+post_failed_att_check <- sum(post_data$ATT_CHECK_post==0, na.rm=T)
+post_percent_failed_att_check <- (round(post_failed_att_check/post_cleaned_total_responses, digits=3))*100
+post_att_check_missing <- sum(is.na(post_data$ATT_CHECK_post))
+post_percent_att_check_missing <- (round(post_att_check_missing/post_cleaned_total_responses, digits=3))*100
+
+# save the cleaned data --------------------------------------------------------
+write.csv(post_data, cleaned_post_filename, row.names=F)
+```
+
+```{r combine data, include=FALSE}
+# sort by the student IDs
+pre_data <- pre_data %>% arrange(student_ID)
+post_data <- post_data %>% arrange(student_ID)
+
+# CHECK THIS: birthdays included? -------------------------------------------------------------------
+# You might be able to match with ID and teacher or with birthday and teacher
+# Comment or uncomment the appropriate code depending on what is present in your dataset
+
+# match pre and post data (can do this under the hood with combine_pre_post function, but wanted to get numbers)
+matched_IDs <- match_IDs(pre_data=pre_data, post_data=post_data)
+n_ID_matches <- nrow(matched_IDs) # record the number of students with matched IDs
+matched_birthday_teacher <- match_birthday_teacher(pre_data=pre_data, post_data=post_data)
+n_birthday_teacher_matches <- nrow(matched_birthday_teacher) # record the number of students with matched bdays
+
+# match pre and post data (function)
+matched_pre_and_post_data <- combine_pre_post(pre_data=pre_data, post_data=post_data)
+
+
+# save the cleaned and matched data to a new file
+write.csv(matched_pre_and_post_data, matched_pre_and_post_filename, row.names=F)
+```
+
+# Check that the data was cleaned properly by reading the report below
+
+## Pre-Course Survey Data Processing
+Raw data source (there should be 2 if you pulled the "Recorded" and "In Progress" responses from Qualtrics):
+
+-   `r raw_completed_pre_filename`
+-   `r raw_inProgress_pre_filename`
+
+These are the variables you computed composites for:
+
+-   `r comp_vars`
+
+These are the corresponding numbers of questions for the variables you computed composites for:
+
+-   `r comp_vars_n_qs`
+
+Here is a list of all the variables contained in the dataset: 
+
+-   `r colnames(pre_data)`
+
+There was originally r pre_length_raw` rows of data from the pre-course survey. We removed `r pre_previews` previews from our team members, `r pre_blanks` blank responses, and `r pre_duplicates` duplicates. In total, we removed `r pre_total_removed` rows from the pre-course survey data. This left us with `r pre_cleaned_total_responses` pre-course survey responses.
+
+Of the `r pre_cleaned_total_responses` total respondents, `r pre_passed_att_check` (`r pre_percent_passed_att_check`%) passed the attention check, whereas `r pre_failed_att_check` (`r pre_percent_failed_att_check`%) failed the attention check, and `r pre_att_check_missing` (`r pre_percent_att_check_missing`%) did not answer the attention check question.
+
+Here is how many respondents there were by teacher:
+```{r pre teachers, echo=FALSE}
+table(pre_data$teacher)
+```
+
+You saved the cleaned dataset as: `r cleaned_pre_filename`
+
+## Post-Course Survey Data Processing
+
+Raw data source (there should be 2 if you pulled the "Recorded" and "In Progress" responses from Qualtrics):
+
+-   `r raw_completed_post_filename`
+-   `r raw_inProgress_post_filename`
+
+These are the variables you computed composites for:
+
+-   `r comp_vars`
+
+These are the corresponding numbers of questions for the variables you computed composites for:
+
+-   `r comp_vars_n_qs`
+
+Here is a list of all the variables contained in the dataset: 
+
+-   `r colnames(post_data)`
+
+There was originally `r post_length_raw` rows of data from the post-course survey. We removed `r post_previews` previews from our team members, `r post_blanks` blank responses, and `r post_duplicates` duplicates. In total, we removed `r post_total_removed` rows from the post-course survey data. This left us with `r post_cleaned_total_responses` post-course survey responses.
+
+Of the `r post_cleaned_total_responses` total respondents, `r post_passed_att_check` (`r post_percent_passed_att_check`%) passed the attention check, whereas `r post_failed_att_check` (`r post_percent_failed_att_check`%) failed the attention check, and `r post_att_check_missing` (`r post_percent_att_check_missing`%) did not answer the attention check question.
+
+Here is how many respondents there were by teacher:
+```{r post teachers, echo=FALSE}
+table(post_data$teacher)
+```
+
+You saved the cleaned dataset as: `r cleaned_post_filename`
+
+## Combing Pre and Post Data
+The pre-course survey had `r nrow(pre_data)` respondents, and the post-course survey had `r nrow(post_data)` respondents. If we were able to match all of our pre and post surveys, we would have had `r min(c(nrow(pre_data), nrow(post_data)))` matches. However, we had `r nrow(matched_pre_and_post_data)` matched pre and post-course surveys. We were able to match `r n_ID_matches` by their student ID and teacher, and we matched `r n_birthday_teacher_matches` more students based on their birthday and teacher.
+
+Here is a list of all the variables contained in the dataset:
+
+-   `r colnames(matched_pre_and_post_data)`
+
+Here is how many respondents there were by teacher:
+```{r pre and post teachers, echo=FALSE}
+table(matched_pre_and_post_data$teacher)
+```
+
+You saved the matched pre and post dataset as: `r matched_pre_and_post_filename`
+

@@ -1,0 +1,670 @@
+---
+title: "ResearchReportTemplate"
+output: html_document
+date: "2023-04-17"
+---
+
+```{r user input, include=FALSE}
+# make sure you put this document in the same directory as files referenced in this script
+# or change the file paths below so that the code works
+
+# Change the text after the assignment operator. Be careful not to change any variable names
+
+# teacher name -----------------------------------------------------------------
+teacher_last_name <- "" # change this each time you want to generate a new
+  # report for a specific teacher
+
+# file names -------------------------------------------------------------------
+cleaned_pre_filename <-  "S23Pre-test_cleaned.csv"
+cleaned_post_filename <-  "S23Post-test_cleaned.csv"
+matched_pre_and_post_filename <- "S23matched_data_cleaned.csv"
+
+# Important Notes --------------------------------------------------------------
+# You may still need to edit the code slightly below to work for your specific dataset
+# There are a few sections highlighted with "CHECK THIS" that you should take a look at
+# I would recommend reading through this whole script and familiarizing yourself with what it
+# does.
+
+# Errors you may encounter:
+  # improper column names (less likely since you should have already prepared the data for analysis)
+  # data that doesn't exist but has code referring to it (one survey may test resilience while another does not)
+  # Some of the code was altered. For example, if you edit a variable name somewhere
+    # and later code references the old variable name, then it will no longer be able to find
+    # that variable
+
+# To overcome these potential errors:
+  # 1. Make sure to use proper column names when creating the survey (listed in Research Partnerships manual)
+    # and change any improper column names before running this script
+  # 2. Comment out code for the variables that don't exist in your dataset
+    # E.g., baseline results or changes across time for non-existent variables in this dataset
+
+# Even if you are able to run this code without errors, you should check to make sure
+# it is working properly. Check the research report by knitting this document 
+# after altering the script for your dataset (if necessary). Make sure that nothing seems awry here.
+# For example, make sure all the results make sense
+# Also, read over the whole script and make sure that you know what it's doing
+# This will prevent any hidden errors that might not be apparent in the data report
+```
+
+```{r setup, include=FALSE}
+# install (if needed) and load packages 
+# install.packages("tidyverse")
+library(tidyverse)
+# install.packages("ggplot2")
+library(ggplot2)
+# install.pacakges("psych")
+library(psych)
+# install.packages('patchwork')
+library(patchwork)
+
+# homemade functions
+source("research_report_functions.R") # file must be in the working directory
+source("data_cleaning_functions.R")
+```
+
+```{r load data, include=FALSE}
+pre_data <- read_csv(cleaned_pre_filename)
+post_data <- read_csv(cleaned_post_filename)
+matched_pre_and_post_data <- read_csv(matched_pre_and_post_filename)
+```
+
+```{r attention check, include=FALSE}
+# pre data 
+n_pre <- nrow(pre_data)
+pre_data_pass <- subset(pre_data, ATT_CHECK_pre == 1) 
+n_pre_data_pass <- nrow(pre_data_pass) ## record how many students passed the attention check
+
+# post data
+n_post <- nrow(post_data)
+post_data_pass <- subset(post_data, ATT_CHECK_post == 1)
+n_post_data_pass <- nrow(post_data_pass)
+
+# all data
+n_pre_and_post <- nrow(matched_pre_and_post_data)
+matched_pre_and_post_data_pass <- matched_pre_and_post_data %>% filter(ATT_CHECK_pre==1 & ATT_CHECK_post==1)
+n_matched_pre_and_post_data_pass <- nrow(matched_pre_and_post_data_pass)
+
+# looking at the attention check
+table(matched_pre_and_post_data$ATT_CHECK_pre, matched_pre_and_post_data$ATT_CHECK_post)
+```
+
+```{r teacher sample size, include=FALSE}
+# filter for the teacher -------------------------------------------------------
+teacher_pre <- subset(pre_data, teacher == teacher_last_name)
+teacher_post <- subset(post_data, teacher == teacher_last_name)
+teacher_pre_and_post <- subset(matched_pre_and_post_data, teacher == teacher_last_name)
+
+# filter based on attention check ----------------------------------------------
+teacher_pre_pass <- teacher_pre %>% filter(ATT_CHECK_pre==1)
+teacher_post_pass <- teacher_post %>% filter(ATT_CHECK_post==1)
+teacher_pre_and_post_pass_one <- teacher_pre_and_post %>% 
+  filter((ATT_CHECK_pre==1 & ATT_CHECK_post==0) | (ATT_CHECK_pre==0 & ATT_CHECK_post==1)) # only passed one
+teacher_pre_and_post_pass <- teacher_pre_and_post %>% filter(ATT_CHECK_pre==1 & ATT_CHECK_post==1)
+teacher_pre_and_post_fail <- teacher_pre_and_post %>% filter(ATT_CHECK_pre==0 & ATT_CHECK_post==0)
+
+# teacher sample size ----------------------------------------------------------
+n_teacher_pre <- nrow(teacher_pre) # pre sample size
+n_teacher_post <- nrow(teacher_post) # post sample size
+n_teacher_pre_and_post <- nrow(teacher_pre_and_post) # matched pre and post sample size
+
+# attention check results ------------------------------------------------------
+n_teacher_pre_pass <- nrow(teacher_pre_pass) # passed att check pre
+n_teacher_post_pass <- nrow(teacher_post_pass) # passed att check post
+n_teacher_pre_and_post_pass <- nrow(teacher_pre_and_post_pass) # passed both pre and post
+n_teacher_pre_and_post_pass_one <- nrow(teacher_pre_and_post_pass_one) # passed either pre or post
+n_teacher_pre_and_post_fail <- nrow(teacher_pre_and_post_fail) # failed pre and post
+```
+
+### `r teacher_last_name`
+
+## Summary of all key variables from the baseline data
+
+Before we begin, we would like to thank you for your participation in the optional surveys. One benefit of conducting these studies is we learn what improvements to make to Finding Focus. It's thanks to teachers like you that we were able to receive this invaluable feedback and improve the course accordingly!
+
+First, I wanted to give you a quick update about sample size this semester. From the digital interface, it appears that \_\_ of your students did Finding Focus. We received data from `r n_teacher_pre` students for the pre-course survey, `r n_teacher_post` students for the post-course survey, and were able to match survey data across time using student IDs for `r n_teacher_pre_and_post` students. We embedded one "attention check" question within each survey to catch students who were not reading the survey questions carefully. This is a standard approach for ensuring high data quality. Of your `r n_teacher_pre_and_post` students, `r n_teacher_pre_and_post_pass_one` failed one attention check and `r n_teacher_pre_and_post_fail` failed both attention checks, so we had to discard their data for analyses. This left viable data for `r n_teacher_pre_and_post_pass` students.
+
+[if the teacher has \<65 participants, include this]{style="color:red;"} Below you will see a summary of the baseline results for your students. However, since our analyses require a large sample size, we had too few responses to analyze the changes from pre to post in just your students. Therefore, the changes across time reported below are the results that emerged from all students who participated in the Spring 2023 surveys across several schools. We collected over 250 student responses.
+
+**Note:** In this summary, we report several correlational findings. The "**r**" represents the strength of the correlation from 0 to 1. Stronger correlations have bigger numbers. When there's a negative sign, it means that the variables are inversely associated with one another (when one is high, the other is low). The "**p**" represents the significance level. Typically, p values less than .05 represent a statistically significant finding. We also report changes from pre-test to post-test. For these results, the "**t**" represents the magnitude of the mean difference between the pre-course survey and the post-course survey, and the sample size for each test is included in parentheses.
+
+```{r teacher baseline data, include=FALSE}
+# Note: ------------------------------------------------------------------------
+# All the data reported below is for all the students who completed the pre-course survey
+# and passed that attention check 
+
+# CHECK THIS -------------------------------------------------------------------
+# make sure that all the variables summarized below are contained within your dataset,
+# otherwise you'll get an error, and don't forget to include any variables that aren't already here
+
+# ERQ --------------------------------------------------------------------------
+ERQ_baseline_sum <- baseline_summary(x="ERQ_pre_avg", max=6, questionnaire_name = "emotion regulation")
+
+# StressM ----------------------------------------------------------------------
+StressM_baseline_sum <- baseline_summary(x="StressM_pre_avg", max=6, questionnaire_name="stress management")
+
+# MW ---------------------------------------------------------------------------
+MW_baseline_sum <- baseline_summary(x="MWQ_pre_avg", max=6, questionnaire_name="mind-wandering")
+# class
+MW_class_total_avg <- mean(pre_data_pass[['MW_class_pre']], na.rm=T) %>% round(digits=2)
+MW_class_teacher_avg <- mean(teacher_pre_pass[['MW_class_pre']], na.rm=T) %>%  round(digits=2)
+MW_class_baseline_sum <- paste("Your students' average score during class was ", MW_class_teacher_avg, " out of 4. In comparison the average score from the total sample this semester was ", MW_class_total_avg, ".",   sep="")
+# HW
+MW_hw_total_avg <- mean(pre_data_pass[['MW_hw_pre']], na.rm=T) %>% round(digits=2)
+MW_hw_teacher_avg <- mean(teacher_pre_pass[['MW_hw_pre']], na.rm=T) %>%  round(digits=2)
+MW_hw_baseline_sum <- paste("Your students' average score during homework was ", MW_hw_teacher_avg, " out of 4. In comparison the average score from the total sample this semester was ", MW_hw_total_avg, ".",   sep="")
+# correlation test
+cor.results <- cor.test(teacher_pre_pass$MWQ_pre_avg, teacher_pre_pass$MW_class_pre, alternative="two.sided", method="kendall")
+MW_class_estimate <- round(cor.results$estimate, digits=2)
+MW_class_corr_p <- cor.results$p.value
+cor.results <- cor.test(teacher_pre_pass$MWQ_pre_avg, teacher_pre_pass$MW_hw_pre, alternative="two.sided", method="kendall")
+MW_hw_estimate <- round(cor.results$estimate, digits=2)
+MW_hw_corr_p <- cor.results$p.value
+# conditional statement dependent on test significance
+if ((MW_class_estimate>0)&&(MW_class_corr_p<.05)&&(MW_hw_estimate>0)&&(MW_hw_corr_p<.05)) {
+    MW_corr_print <- paste("Relatedly, we found that your students who mind-wander more during daily life are more likely to mind-wander during class (r=", MW_class_estimate, ", p<.05) and while doing homework (r=", MW_hw_estimate, ", p<.05).", sep="")
+  } else if ((MW_class_estimate>0)&&(MW_class_corr_p<.05)&&(MW_hw_estimate<0)&&(MW_hw_corr_p<.05)) {
+    MW_corr_print <- paste("Relatedly, we found that your students who mind-wander more during daily life are more likely to mind-wander during class (r=", MW_class_estimate, ", p<.05).", sep="")
+  } else if ((MW_class_estimate<0)&&(MW_class_corr_p<.05)&&(MW_hw_estimate>0)&&(MW_hw_corr_p<.05)) {
+    MW_corr_print <- paste("Relatedly, we found that your students who mind-wander more during daily life are more likely to mind-wander while doing homework (r=", MW_hw_estimate, ", p<.05).", sep="")
+  } else {
+    MW_corr_print <- ""
+  }
+
+# MT ---------------------------------------------------------------------------
+# class
+MT_class_total_avg <- mean(pre_data_pass[['MT_class_pre']], na.rm=T) %>% round(digits=2)
+MT_class_teacher_avg <- mean(teacher_pre_pass[['MT_class_pre']], na.rm=T) %>%  round(digits=2)
+MT_class_baseline_sum <- paste("Your students' average score during class was ", MT_class_teacher_avg, " out of 4. In comparison the average score from the total sample this semester was ", MT_class_total_avg, ".",   sep="")
+# HW
+MT_hw_total_avg <- mean(pre_data_pass[['MT_hw_pre']], na.rm=T) %>% round(digits=2)
+MT_hw_teacher_avg <- mean(teacher_pre_pass[['MT_hw_pre']], na.rm=T) %>%  round(digits=2)
+MT_hw_baseline_sum <- paste("Your students' average score during homework was ", MT_hw_teacher_avg, " out of 4. In comparison the average score from the total sample this semester was ", MT_hw_total_avg, ".",   sep="")
+
+# RS ---------------------------------------------------------------------------
+RS_baseline_sum <- baseline_summary(x="RS_pre_avg", max=5, questionnaire_name = "resilience")
+
+# GrowM ------------------------------------------------------------------------
+GrowM_baseline_sum <- baseline_summary(x="GrowM_pre_avg", max=6, questionnaire_name="growth mindset")
+
+# SelfEf -----------------------------------------------------------------------
+SelfEf_baseline_sum <- baseline_summary(x="SelfEf_pre_avg", max=6, questionnaire_name="self-efficacy")
+
+# Motiv ------------------------------------------------------------------------
+Motiv_baseline_sum <- baseline_summary(x="Motiv_pre_avg", max=6, questionnaire_name="motivation")
+
+# undivided attention actual vs ideal ------------------------------------------
+total_teacher_undivided_actual_pre_avg <- mean(teacher_pre_pass$undivided_actual_pre_1, na.rm=T) %>% round(digits = 2)
+total_teacher_undivided_ideal_pre_avg <- mean(teacher_pre_pass$undivided_ideal_pre_1, na.rm=T) %>% round(digits = 2)
+total_undivided_actual_pre_avg <- mean(pre_data_pass$undivided_actual_pre_1, na.rm=T) %>% round(digits = 2)
+total_undivided_ideal_pre_avg <- mean(pre_data_pass$undivided_ideal_pre_1, na.rm=T) %>% round(digits = 2)
+
+# room to grow (ideal focus > actual focus) ------------------------------------
+teacher_room_to_grow <- mean(teacher_pre_pass$room_to_grow, na.rm = T) %>% round(digits=4) * 100
+total_room_to_grow <- mean(pre_data_pass$room_to_grow, na.rm=T) %>% round(digits=4) * 100
+
+# difficulties -----------------------------------------------------------------
+total_teacher_demands_pre_avg <- mean(teacher_pre_pass$demands_pre, na.rm=T) %>% round(digits=2)
+total_demands_pre_avg <- mean(pre_data_pass$demands_pre, na.rm=T) %>% round(digits=2)
+```
+
+------------------------------------------------------------------------
+
+## Baseline Results
+
+### 1. Emotion Regulation
+
+`r ERQ_baseline_sum` Higher scores indicate more skill at relating to emotions, such as by re-focusing their attention or re-evaluating situations to change how they feel.
+
+### 2. Stress Management
+
+`r StressM_baseline_sum` Higher scores indicate greater skill in managing stress.
+
+### 3. Resiliency
+
+`r RS_baseline_sum` Higher scores indicate greater skill at recovering from difficulties.
+
+### 4. Mind-Wandering and Multitasking
+
+We tested how frequently your students engage in task-unrelated thought (also known as mind-wandering) during everyday life, class, and while doing homework.
+
+`r MW_baseline_sum` Higher scores indicate more frequent mind-wandering during everyday life.
+
+Additionally, your students rated how much they mind-wander during class and while doing homework. Higher scores indicate more frequent mind-wandering during academic activities. `r MW_class_baseline_sum` `r MW_hw_baseline_sum`
+
+`r MW_corr_print`
+
+Lastly, we also assessed how often your students multitasked while in class and doing homework. Higher scores indicate greater use of electronic devices for unrelated tasks during academic activities. `r MT_class_baseline_sum` `r MT_hw_baseline_sum`
+
+### 5. Beliefs about ability to focus attention and current focus levels
+
+We also assessed 3 beliefs about focus: (i) whether students believed that their ability to focus can improve (growth mindset), (ii) if they knew how to improve their focus (self-efficacy), and (iii) the degree to which they want to improve their attention (motivation).
+
+-   `r GrowM_baseline_sum` Higher scores indicate more strongly believing that focus is a trainable skill.
+-   `r SelfEf_baseline_sum` Higher scores indicate greater confidence in improving their focus.
+-   `r Motiv_baseline_sum` Higher scores indicate greater motivation to improve their ability to focus.
+
+Furthermore, students who are currently struggling to focus on class have more room to grow, especially if they wish they focused more, so we measured your students current versus their ideal levels of focus and the demands they are currently facing.
+
+-   Your students estimated that they kept their undivided attention on class `r total_teacher_undivided_actual_pre_avg`% of the time, but they would ideally keep their undivided attention on class `r total_teacher_undivided_ideal_pre_avg`% of the time. Importantly, `r teacher_room_to_grow`% of your students reported focusing less often than they felt they should, indicating room for growth. In comparison, students from the total sample currently keep their undivided attention on class `r total_undivided_actual_pre_avg`% of the time, but they would ideally keep their undivided attention on class `r total_undivided_ideal_pre_avg`% of the time. A total of `r total_room_to_grow`% of students reported focusing less often than they felt they should.
+-   Your students' average response when rating the demands they were facing at the time of the survey was `r total_teacher_demands_pre_avg` out 5. In comparison, the average response across the whole sample was `r total_demands_pre_avg`. Higher scores indicate greater demands.
+
+------------------------------------------------------------------------
+
+## Changes Across Time:
+
+```{r total sample t tests, include=FALSE}
+# Note: ------------------------------------------------------------------------
+# All the data reported below is for all the students who completed the pre and post-course survey
+# and passed both attention checks. To see the data for all students, regardless of 
+# whether or not they passed the attention check, change the df used below from
+# matched_pre_and_post_data_pass to matched_pre_and_post_data
+
+# ERQ --------------------------------------------------------------------------
+ttest_ERQ <- ttest_result(post=matched_pre_and_post_data_pass$ERQ_post_avg, pre=matched_pre_and_post_data_pass$ERQ_pre_avg, variable_name="emotion regulation") 
+
+# StressM ----------------------------------------------------------------------
+ttest_StressM <- ttest_result(post=matched_pre_and_post_data_pass$StressM_post_avg, pre=matched_pre_and_post_data_pass$StressM_pre_avg, variable_name="stress management") 
+
+# MW ---------------------------------------------------------------------------
+ttest_MW <- ttest_result(post=matched_pre_and_post_data_pass$MWQ_post_avg, pre=matched_pre_and_post_data_pass$MWQ_pre_avg, variable_name="mind-wandering during everyday life") 
+ttest_MW_class <- ttest_result(post=matched_pre_and_post_data_pass$MW_class_post, pre=matched_pre_and_post_data_pass$MW_class_pre, variable_name="mind-wandering during class") 
+ttest_MW_hw <- ttest_result(post=matched_pre_and_post_data_pass$MW_hw_post, pre=matched_pre_and_post_data_pass$MW_hw_pre, variable_name="mind-wandering during homework") 
+ttest_MT_class <- ttest_result(post=matched_pre_and_post_data_pass$MT_class_post, pre=matched_pre_and_post_data_pass$MT_class_pre, variable_name="multitasking during class") 
+ttest_MT_hw <- ttest_result(post=matched_pre_and_post_data_pass$MT_hw_post, pre=matched_pre_and_post_data_pass$MT_hw_pre, variable_name="multitasking during homework") 
+
+# RS ---------------------------------------------------------------------------
+ttest_RS <- ttest_result(post=matched_pre_and_post_data_pass$RS_post_avg, pre=matched_pre_and_post_data_pass$RS_pre_avg, variable_name="resilience") 
+
+# GrowM ------------------------------------------------------------------------
+ttest_GrowM <- ttest_result(post=matched_pre_and_post_data_pass$GrowM_post_avg, pre=matched_pre_and_post_data_pass$GrowM_pre_avg, variable_name="growth mindset") 
+
+# SelfEf -----------------------------------------------------------------------
+ttest_SelfEf <- ttest_result(post=matched_pre_and_post_data_pass$SelfEf_post_avg, pre=matched_pre_and_post_data_pass$SelfEf_pre_avg, variable_name="self-efficacy")
+
+# Motivation -------------------------------------------------------------------
+ttest_Motiv <- ttest_result(post=matched_pre_and_post_data_pass$Motiv_post_avg, pre=matched_pre_and_post_data_pass$Motiv_pre_avg, variable_name="motivation")
+
+# Clasroom focus ---------------------------------------------------------------
+ttest_actual_class_focus <- ttest_result(post=matched_pre_and_post_data_pass$undivided_actual_pst_1,pre=matched_pre_and_post_data_pass$undivided_actual_pre_1, variable_name="students' levels of actual classroom focus")  
+ttest_ideal_class_focus <- ttest_result(post=matched_pre_and_post_data_pass$undivided_ideal_post_1, pre=matched_pre_and_post_data_pass$undivided_ideal_pre_1, variable_name="students' levels of ideal classroom focus") 
+
+# Classroom focus when there's room for growth ---------------------------------
+room_to_grow_df <- matched_pre_and_post_data_pass %>% filter(room_to_grow == T)
+ttest_actual_class_focus_roomToGrow <- ttest_result(post=room_to_grow_df$undivided_actual_pst_1,pre=room_to_grow_df$undivided_actual_pre_1, variable_name="students' levels of actual classroom focus")
+
+# demands ----------------------------------------------------------------------
+ttest_demands <- ttest_result(post=matched_pre_and_post_data_pass$demands_post, pre=matched_pre_and_post_data_pass$demands_pre, variable_name="demands")
+```
+
+```{r teacher sample t tests, include=FALSE}
+# Note: ------------------------------------------------------------------------
+# All the data reported below is for all the students who completed the pre and post-course survey
+# and passed both attention checks. To see the data for all students, regardless of 
+# whether or not they passed the attention check, change the df used below from
+# teacher_pre_and_post_pass to teacher_pre_and_post
+
+# ERQ --------------------------------------------------------------------------
+teacher_ttest_ERQ <- ttest_result(post=teacher_pre_and_post_pass$ERQ_post_avg, pre=teacher_pre_and_post_pass$ERQ_pre_avg, variable_name="emotion regulation")
+
+# StressM ----------------------------------------------------------------------
+teacher_ttest_StressM <- ttest_result(post=teacher_pre_and_post_pass$StressM_post_avg, pre=teacher_pre_and_post_pass$StressM_pre_avg, variable_name="stress management") 
+
+# MW ---------------------------------------------------------------------------
+teacher_ttest_MW <- ttest_result(post=teacher_pre_and_post_pass$MWQ_post_avg, pre=teacher_pre_and_post_pass$MWQ_pre_avg, variable_name="mind-wandering during everyday life")
+teacher_ttest_MW_class <- ttest_result(post=teacher_pre_and_post_pass$MW_class_post, pre=teacher_pre_and_post_pass$MW_class_pre, variable_name="mind-wandering during class") 
+teacher_ttest_MW_hw <- ttest_result(post=teacher_pre_and_post_pass$MW_hw_post, pre=teacher_pre_and_post_pass$MW_hw_pre, variable_name="mind-wandering during hw") 
+teacher_ttest_MT_class <- ttest_result(post=teacher_pre_and_post_pass$MT_class_post, pre=teacher_pre_and_post_pass$MT_class_pre, variable_name="multitasking during class") 
+teacher_ttest_MT_hw <- ttest_result(post=teacher_pre_and_post_pass$MT_hw_post, pre=teacher_pre_and_post_pass$MT_hw_pre, variable_name="multitasking during hw") 
+
+# RS ---------------------------------------------------------------------------
+teacher_ttest_RS <- ttest_result(post=teacher_pre_and_post_pass$RS_post_avg, pre=teacher_pre_and_post_pass$RS_pre_avg, variable_name="resilience")
+
+# GrowM ------------------------------------------------------------------------
+teacher_ttest_GrowM <- ttest_result(post=teacher_pre_and_post_pass$GrowM_post_avg, pre=teacher_pre_and_post_pass$GrowM_pre_avg, variable_name="growth mindset") 
+
+# SelfEf -----------------------------------------------------------------------
+teacher_ttest_SelfEf <- ttest_result(post=teacher_pre_and_post_pass$SelfEf_post_avg, pre=teacher_pre_and_post_pass$SelfEf_pre_avg, variable_name="self-efficacy")
+
+# Motivation -------------------------------------------------------------------
+teacher_ttest_Motiv <- ttest_result(post=teacher_pre_and_post_pass$Motiv_post_avg, pre=teacher_pre_and_post_pass$Motiv_pre_avg, variable_name="motivation")
+
+# classroom focus ------------------------------------------------------------------------
+teacher_ttest_actual_class_focus <- ttest_result(post=teacher_pre_and_post_pass$undivided_actual_pst_1,pre=teacher_pre_and_post_pass$undivided_actual_pre_1, variable_name="students' actual level levels of classroom focus")
+teacher_ttest_ideal_class_focus <- ttest_result(post=teacher_pre_and_post_pass$undivided_ideal_post_1, pre=teacher_pre_and_post_pass$undivided_ideal_pre_1, variable_name="students' levels of ideal classroom focus")
+
+# Classroom focus when there's room for growth ---------------------------------
+teacher_room_to_grow_df <- teacher_pre_and_post_pass %>% filter(room_to_grow == T)
+teacher_ttest_actual_class_focus_roomToGrow <- ttest_result(post=teacher_room_to_grow_df$undivided_actual_pst_1,pre=teacher_room_to_grow_df$undivided_actual_pre_1, variable_name="students' levels of actual classroom focus")
+
+# demands ----------------------------------------------------------------------
+teacher_ttest_demands <- ttest_result(post=teacher_pre_and_post_pass$demands_post, pre=teacher_pre_and_post_pass$demands_pre, variable_name="demands")
+
+```
+
+```{r total change graphs, include=FALSE}
+# Note: ------------------------------------------------------------------------
+# All the data reported below is for all the students who completed the pre and post-course survey
+# and passed both attention checks. To see the data for all students, regardless of 
+# whether or not they passed the attention check, change the df used below from
+# matched_pre_and_post_data_pass to matched_pre_and_post_data_pass
+
+# dfs for graphing -------------------------------------------------------------
+ERQ_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="ERQ")
+StressM_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="StressM")
+MW_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="MWQ")
+MW_class_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="MW_class", pre_append="_pre", post_append="_post")
+MW_hw_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="MW_hw", pre_append="_pre", post_append="_post")
+MT_class_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="MT_class", pre_append="_pre", post_append="_post")
+MT_hw_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="MT_hw", pre_append="_pre", post_append="_post")
+RS_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="RS")
+GrowM_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="GrowM")
+SelfEf_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="SelfEf")
+Motiv_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="Motiv")
+actual_focus_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="undivided_actual", pre_append="_pre_1", post_append="_pst_1")
+actualFocus_roomtoGrow_df <- df_for_graphing(df=room_to_grow_df, var="undivided_actual", pre_append="_pre_1", post_append="_pst_1")
+ideal_focus_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="undivided_ideal", pre_append="_pre_1", post_append="_post_1")
+demands_df <- df_for_graphing(df=matched_pre_and_post_data_pass, var="demands", pre_append="_pre", post_append="_post")
+
+# graphs ------------------------------------------------------------------------
+# 1st panel
+ERQ_graph <- graph(data=ERQ_df, ylab="Emotion Regulation", title="")
+StressM_graph <- graph(data=StressM_df, ylab="Stress Management", title="")
+RS_graph <- graph(data=RS_df, ylab="Resilience", title="")
+# 2nd panel
+MW_graph <- graph(data=MW_df, ylab="Mind-Wandering", title="")
+MW_class_graph <- graph(data=MW_class_df, ylab="Mind-Wandering \nDuring Class", title="")
+MW_hw_graph <- graph(data=MW_hw_df, ylab="Mind-Wandering During \nHomework", title="")
+# 3rd panel
+MT_class_graph <- graph(data=MT_class_df, ylab="Multitasking During Class", title="")
+MT_hw_graph <- graph(data=MT_hw_df, ylab="Multitasking During Homework", title="")
+# 4th panel
+GrowM_graph <- graph(data=GrowM_df, ylab="Growth Mindset", title="")
+SelfEf_graph <- graph(data=SelfEf_df, ylab="Self-Efficacy", title="")
+Motiv_graph <- graph(data=Motiv_df, ylab="Motivation", title="")
+# 5th panel
+actual_focus_graph <- graph(data=actual_focus_df, ylab="Actual Classroom Focus", title="")
+actualFocus_roomToGrow_graph <- graph(data=actualFocus_roomtoGrow_df, ylab="Actual Classroom Focus", title="")
+ideal_focus_graph <- graph(data=ideal_focus_df, ylab="Ideal Classroom Focus", title="")
+demands_graph <- graph(data=demands_df, ylab="Demands", title="")
+
+# combining the graphs into a figure
+# Fig 1: ER, StressM, and RS
+fig1 <- (ERQ_graph | StressM_graph | RS_graph) + 
+  plot_annotation(tag_levels='a', tag_prefix = 'Fig 1.')
+
+# MW, MW_class, MW_hw, MT_class, and MT_hw (5)
+fig2 <- (MW_graph | MW_class_graph | MW_hw_graph) +
+  plot_annotation(tag_levels='a', tag_prefix = 'Fig 2.')
+
+# MT
+fig3 <-  MT_class_graph + MT_hw_graph +
+  plot_annotation(tag_levels='a', tag_prefix='Fig 3.')
+
+# GrowM, SelfEf, Motivation, actual classroom focus, 
+fig4 <-  (GrowM_graph | SelfEf_graph | Motiv_graph) +
+  plot_annotation(tag_levels='a', tag_prefix='Fig 4.')
+
+# actual classroom focus, ideal classroom focus, and demands
+fig5 <- (actualFocus_roomToGrow_graph | demands_graph) +
+  plot_annotation(tag_levels = 'a', tag_prefix='Fig 5.')
+
+```
+
+```{r teacher change graphs, echo=FALSE}
+# Note: ------------------------------------------------------------------------
+# All the data reported below is for all the students who completed the pre and post-course survey
+# and passed both attention checks. To see the data for all students, regardless of 
+# whether or not they passed the attention check, change the df used below from
+# teacher_pre_and_post_pass to teacher_pre_and_post
+
+# create all the dfs
+teacher_ERQ_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="ERQ")
+teacher_StressM_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="StressM")
+teacher_MW_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="MWQ")
+teacher_MW_class_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="MW_class", pre_append="_pre", post_append="_post")
+teacher_MW_hw_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="MW_hw", pre_append="_pre", post_append="_post")
+teacher_MT_class_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="MT_class", pre_append="_pre", post_append="_post")
+teacher_MT_hw_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="MT_hw", pre_append="_pre", post_append="_post")
+teacher_RS_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="RS")
+teacher_GrowM_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="GrowM")
+teacher_SelfEf_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="SelfEf")
+teacher_Motiv_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="Motiv")
+teacher_actual_focus_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="undivided_actual", pre_append="_pre_1", post_append="_pst_1")
+teacher_actualFocus_roomtoGrow_df <- df_for_graphing(df=teacher_room_to_grow_df, var="undivided_actual", pre_append="_pre_1", post_append="_pst_1")
+teacher_ideal_focus_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="undivided_ideal", pre_append="_pre_1", post_append="_post_1")
+teacher_demands_df <- df_for_graphing(df=teacher_pre_and_post_pass, var="demands", pre_append="_pre", post_append="_post")
+
+# graph
+# 1st panel
+teacher_ERQ_graph <- graph(data=teacher_ERQ_df, ylab="Emotion Regulation", title="")
+teacher_StressM_graph <- graph(data=teacher_StressM_df, ylab="Stress Management", title="")
+teacher_RS_graph <- graph(data=teacher_RS_df, ylab="Resilience", title="")
+# 2nd panel
+teacher_MW_graph <- graph(data=teacher_MW_df, ylab="Mind-Wandering", title="")
+teacher_MW_class_graph <- graph(data=teacher_MW_class_df, ylab="Mind-Wandering \nDuring Class", title="")
+teacher_MW_hw_graph <- graph(data=teacher_MW_hw_df, ylab="Mind-Wandering During \nHomework", title="")
+# 3rd panel
+teacher_MT_class_graph <- graph(data=teacher_MT_class_df, ylab="Multitasking During Class", title="")
+teacher_MT_hw_graph <- graph(data=teacher_MT_hw_df, ylab="Multitasking During Homework", title="")
+# 4th panel
+teacher_GrowM_graph <- graph(data=teacher_GrowM_df, ylab="Growth Mindset", title="")
+teacher_SelfEf_graph <- graph(data=teacher_SelfEf_df, ylab="Self-Efficacy", title="")
+teacher_Motiv_graph <- graph(data=teacher_Motiv_df, ylab="Motivation", title="")
+# 5th panel
+teacher_actual_focus_graph <- graph(data=teacher_actual_focus_df, ylab="Actual Classroom Focus", title="")
+teacher_actualFocus_roomToGrow_graph <- graph(data=teacher_actualFocus_roomtoGrow_df, ylab="Actual Classroom Focus", title="")
+teacher_ideal_focus_graph <- graph(data=teacher_ideal_focus_df, ylab="Ideal Classroom Focus", title="")
+teacher_demands_graph <- graph(data=teacher_demands_df, ylab="Demands", title="")
+
+
+# combining the graphs into a figure
+# Fig 1: ER, StressM, and RS
+teacher_fig1 <- (teacher_ERQ_graph | teacher_StressM_graph | teacher_RS_graph) + 
+  plot_annotation(tag_levels='a', tag_prefix = 'Fig 1.')
+
+# MW, MW_class, MW_hw, MT_class, and MT_hw (5)
+teacher_fig2 <- (teacher_MW_graph | teacher_MW_class_graph | teacher_MW_hw_graph) +
+  plot_annotation(tag_levels='a', tag_prefix = 'Fig 2.')
+
+# MT
+teacher_fig3 <-  teacher_MT_class_graph + teacher_MT_hw_graph +
+  plot_annotation(tag_levels='a', tag_prefix='Fig 3.')
+
+# GrowM, SelfEf, Motivation, actual classroom focus, 
+teacher_fig4 <-  (teacher_GrowM_graph | teacher_SelfEf_graph | teacher_Motiv_graph) +
+  plot_annotation(tag_levels='a', tag_prefix='Fig 4.')
+
+# actual classroom focus, ideal classroom focus, and demands
+teacher_fig5 <- (teacher_actualFocus_roomToGrow_graph | teacher_demands_graph) +
+  plot_annotation(tag_levels = 'a', tag_prefix='Fig 5.')
+```
+
+### [Here are the results from the overall sample:]{style="color:red;"}
+
+**Note**: The following results are from all students who participated across schools. The y-axis has been altered so that the changes from pre to post are more apparent and doesn't reflect the minimum or maximum value possible on a questionnaire.
+
+### Figure 1: Average Changes in Emotion Regulation, Stress Management, and Resilience
+
+```{r fig 1, echo=FALSE, fig.width=10, fig.height=4}
+fig1
+```
+
+-   Fig 1.a: `r ttest_ERQ`
+-   Fig 1.b: `r ttest_StressM`
+-   Fig 1.c: `r ttest_RS`
+
+### Figure 2: Average Changes in Mind-Wandering
+
+```{r fig 2, echo=FALSE, fig.width=10, fig.height=4}
+fig2
+```
+
+-   Fig 2.a: `r ttest_MW`
+-   Fig 2.b: `r ttest_MW_class`
+-   Fig 2.c: `r ttest_MW_hw`
+
+### Figure 3: Average Changes in Multitasking
+
+```{r fig 3, echo=FALSE, fig.width=10, fig.height=4}
+fig3
+```
+
+-   Fig 3.a: `r ttest_MT_class`
+-   Fig 3.b: `r ttest_MT_hw`
+
+### Figure 4: Average Change in Growth Mindset, Self-Efficacy, and Motivation
+
+```{r fig4, echo=FALSE, fig.width=10, fig.height=4}
+fig4
+```
+
+-   Fig 4.a: `r ttest_GrowM`
+-   Fig 4.b: `r ttest_SelfEf`
+-   Fig 4.c: `r ttest_Motiv`
+
+### Figure 5: Average Change in Actual Classroom Focus, Ideal Classroom Focus, and Demands
+
+```{r fig 5, echo=FALSE, fig.width=10, fig.height=4}
+fig5
+```
+
+-   Fig 5.a: Although levels of focus did not significantly change across the entire sample, among the `r total_room_to_grow`% of students with any discrepancy between ideal and actual focus at pretest, `r ttest_actual_class_focus_roomToGrow`
+-   Fig 5.b: `r ttest_demands`
+
+### [Here are the results for your students only:]{style="color:red;"}
+
+**Note**: The y-axis has been altered so that the changes from pre to post are more apparent and doesn't reflect the minimum or maximum value possible on a questionnaire.
+
+### Figure 1: Average Changes in Emotion Regulation, Stress Management, and Resilience
+
+```{r teacher fig 1, echo=FALSE, fig.width=10, fig.height=4}
+teacher_fig1
+```
+
+-   Fig 1.a: `r teacher_ttest_ERQ`
+-   Fig 1.b: `r teacher_ttest_StressM`
+-   Fig 1.c: `r teacher_ttest_RS`
+
+### Figure 2: Average Changes in Mind-Wandering
+
+```{r teacher fig 2, echo=FALSE, fig.width=10, fig.height=4}
+teacher_fig2
+```
+
+-   Fig 2.a: `r teacher_ttest_MW`
+-   Fig 2.b: `r teacher_ttest_MW_class`
+-   Fig 2.c: `r teacher_ttest_MW_hw`
+
+### Figure 3: Average Changes in Multitasking
+
+```{r teacher fig 3, echo=FALSE, fig.width=10, fig.height=4}
+teacher_fig3
+```
+
+-   Fig 3.a: `r teacher_ttest_MT_class`
+-   Fig 3.b: `r teacher_ttest_MT_hw`
+
+### Figure 4: Average Change in Growth Mindset, Self-Efficacy, and Motivation
+
+```{r teacher fig4, echo=FALSE, fig.width=10, fig.height=4}
+teacher_fig4
+```
+
+-   Fig 4.a: `r teacher_ttest_GrowM`
+-   Fig 4.b: `r teacher_ttest_SelfEf`
+-   Fig 4.c: `r teacher_ttest_Motiv`
+
+### Figure 5: Average Change in Actual Classroom Focus, Ideal Classroom Focus, and Demands
+
+```{r teacher fig 5, echo=FALSE, fig.width=10, fig.height=6}
+teacher_fig5
+```
+
+-   Fig 5.a: `r teacher_ttest_actual_class_focus`
+-   Fig 5.b: Among the `r teacher_room_to_grow`% of students with any discrepancy between ideal and actual focus at pretest, `r teacher_ttest_actual_class_focus_roomToGrow`
+-   Fig 5.b: `r teacher_ttest_ideal_class_focus`
+-   Fig 5.c: `r teacher_ttest_demands`
+
+## Feedback
+
+```{r teachers students feedback, include=FALSE}
+# Helpful
+FF_helpful <- drop_na(teacher_pre_and_post_pass['CF1_post'])
+FF_helpful_percentage <- sum(FF_helpful['CF1_post']==1)/nrow(FF_helpful)
+FF_helpful_percentage <- 100*round(FF_helpful_percentage, digits=2)
+
+# Unhelpful
+#count(teacher_pre_and_post_pass$CF1_no_post)
+
+# Recommend
+recommend <-  teacher_pre_and_post_pass[['NPS_post']]-1 # this was scaled wrong
+recommend_mean <- mean(recommend, na.rm=T) %>% round(digits=2)
+
+# DB repetitive
+DB_repetitive <-  drop_na(teacher_pre_and_post_pass['CF2_post'])
+DB_repetitive_percentage <- sum(DB_repetitive['CF2_post']==1)/nrow(DB_repetitive)
+DB_repetitive_percentage <- 100*round(DB_repetitive_percentage, digits=2)
+
+# lessons repetitive
+les_repetitive <- drop_na(teacher_pre_and_post_pass['CF3_post'])
+les_repetitive_percentage <- sum(les_repetitive['CF3_post']==1)/nrow(les_repetitive)
+les_repetitive_percentage <- 100*round(les_repetitive_percentage, digits=2)
+
+# academic help
+academic_help <- drop_na(teacher_pre_and_post_pass['CF4_post'])
+academic_help_percentage <- sum(academic_help['CF4_post']==1)/nrow(academic_help)
+academic_help_percentage <- 100*round(academic_help_percentage, digits=2)
+```
+
+In addition to assessing how your students changed after using Finding Focus, we also asked them for feedback on the app. Here is what they had to say:
+
+1.  `r FF_helpful_percentage`% of your students said Finding Focus was helpful.
+2.  When rating how likely they were to recommend Finding Focus to a friend or classmate, your students responded with a `r recommend_mean` on average on a scale from 0 to 10.
+3.  `r academic_help_percentage`% of your students think the strategies they learned in Finding Focus will help them academically.
+
+## Comprehension Quiz
+
+```{r comprehension quiz, include=FALSE}
+teacher_CQ_avg_score <- mean(teacher_pre_and_post_pass$CQ_score, na.rm=T)*100
+teacher_CQ_avg_score <- round(teacher_CQ_avg_score, digits=0)
+total_CQ_avg_score <- mean(matched_pre_and_post_data_pass$CQ_score, na.rm=T)*100
+total_CQ_avg_score <- round(total_CQ_avg_score, digits=0)
+```
+
+Lastly, we assessed how much your students learned from the course with a 3-question comprehension quiz. Your students' average score on the comprehension quiz was `r teacher_CQ_avg_score`%, whereas the average for this semester's whole sample was `r total_CQ_avg_score`%.
+
+Here are the questions from the comprehension quiz for reference with the correct answer choices bolded:
+
+1.  If you were to anchor your attention on music, like you do in a Daily Beat, which of the following would be distractions?
+    a.  the lyrics
+    b.  the rhythm of the song
+    c.  **the voices of students around you**
+    d.  all of the above
+2.  In Finding Focus, what does "fueling the fire" mean?
+    a.  **Our thoughts and evaluations increase the intensity of our emotions**
+    b.  We can fire up our motivation to be more productive through anchoring on the task at hand
+    c.  Training attention increases our focus just like fuel increases the size of a fire
+    d.  Circumstances beyond our control fuel the fire of our emotions
+3.  What is the difference between thoughts and thinking?
+    a.  Thoughts happen in the present moment; thinking is in the past
+    b.  Thoughts are ongoing; thinking is temporary
+    c.  **Thoughts are short-lived; thinking is when you engage with a thought and turn it into a train of thoughts**
+    d.  Thoughts and thinking are the same thing
+
+------------------------------------------------------------------------
+
+## Conclusion
+
+[include this paragraph if you used the total sample data]{style="color:red;"}
+
+Across the whole sample, students experienced: (1) increased self-efficacy, (2) increased growth mindset, (3) improved stress management skills, (4) improved emotion regulation, (5) decreased mind-wandering during class, and (6) improved classroom focus among the students who reported a discrepancy between their ideal and actual levels of focus. For a 10-day course, we find this quite exciting!
+
+To explain these results in a different way, after completing Finding Focus, students feel more confident in their ability to improve their focus using the tools from the course. Additionally, students believe their levels of focus can be strengthened with deliberate effort. They also have more skills in managing their stress, which is especially important given that chronic stress can have detrimental effects on mental and physical health. Relatedly, students learned how to skillfully relate to their emotions by re-focusing their attention or re-evaluating situations. They also spend less time thinking about things off-topic during class, and among the students who focused less than they ideally would at baseline, they experienced increased levels of classroom focus.
+
+Despite this positive impact on students, there's still more work to be done to optimize Finding Focus. Eventually, we hope to observe significant increases in motivation and actual focus in the classroom across the whole sample. With this goal in mind, our team is currently building a new feature to further help your future students put the skills of anchoring, focusing, and releasing into practice while they're in class. This new feature will launch soon, and we'll be running another study in the fall to measure its impact.
+
+Thank you again for facilitating Finding Focus. By doing so, not only do your students benefit, but it also helps our team learn how to refine the tool so that it will someday help hundreds of thousands of students across the country.
+
+[include this paragraph if you used the teacher sample data]{style="color:red;"}
+
+**write paragraph**
