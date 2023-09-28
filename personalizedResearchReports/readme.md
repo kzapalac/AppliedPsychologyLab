@@ -14,5 +14,6 @@ in which teacher name could be input once to receive a teacher’s personalized 
 - UnformattedDemoResearchReportS23.pdf: Direct output from knitting the Rmd file. This was pasted into a Word document and formatted nicer. Additionally
   explanation of the results may have been necessary if a teacher's sample was used. Ideally the formatting would have been done directly in R markdown,
   but I didn't have time to learn how to do this.
+- data_cleaning_functions.R: used to clean the data previously. Just included for redundancy in case someone realized they needed to perform additional cleaning at this stage in the process.
 - research_report_functions.R: Functions used to summarize baseline results and changes across time, including standardized figures to display changes
   across time. Since datasets were similar across semesters, these functions could be used to analyze semesterly data quicker.
